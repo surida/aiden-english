@@ -8,6 +8,8 @@ export type Student = {
   created_at: string;
 };
 
+export type Interest = { tag: string; note: string | null };
+
 export async function getStudent(
   client: SupabaseClient,
   id: string,
@@ -28,6 +30,18 @@ export async function setLevel(
 ): Promise<void> {
   const { error } = await client.from("students").update({ level }).eq("id", id);
   if (error) throw error;
+}
+
+export async function getInterests(
+  client: SupabaseClient,
+  studentId: string,
+): Promise<Interest[]> {
+  const { data, error } = await client
+    .from("interests")
+    .select("tag, note")
+    .eq("student_id", studentId);
+  if (error) throw error;
+  return (data ?? []) as Interest[];
 }
 
 export async function addInterest(

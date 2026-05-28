@@ -1,6 +1,6 @@
 import { test, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getStudent, setLevel, addInterest } from "./students";
+import { getStudent, setLevel, addInterest, getInterests } from "./students";
 
 // Chainable + thenable mock of the Supabase query builder. Every method records
 // its args and returns the same builder; `single()` and awaiting the builder
@@ -46,6 +46,15 @@ test("addInterest defaults note to null when omitted", async () => {
   const m = makeMock();
   await addInterest(m as unknown as SupabaseClient, "s1", "games");
   expect(m.insert).toHaveBeenCalledWith({ student_id: "s1", tag: "games", note: null });
+});
+
+test("getInterests selects tag + note for the student", async () => {
+  const m = makeMock({ data: [{ tag: "kpop", note: "exam on Fri" }], error: null });
+  const out = await getInterests(m as unknown as SupabaseClient, "s1");
+  expect(m.from).toHaveBeenCalledWith("interests");
+  expect(m.select).toHaveBeenCalledWith("tag, note");
+  expect(m.eq).toHaveBeenCalledWith("student_id", "s1");
+  expect(out).toEqual([{ tag: "kpop", note: "exam on Fri" }]);
 });
 
 test("propagates a supabase error instead of swallowing it", async () => {
