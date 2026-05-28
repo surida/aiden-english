@@ -20,7 +20,7 @@ const PRESETS: Persona[] = [
   {
     id: "luna",
     name: "Luna",
-    voice: "nova",
+    voice: "coral",
     age: "older-sister",
     personality:
       "Warm, cool older-sister energy. Encouraging, gently nudges you to say more.",
