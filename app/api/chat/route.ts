@@ -1,6 +1,7 @@
 import { createOpenAI, MODELS } from "@/lib/openai";
 import { createServerClient } from "@/lib/db";
 import { getStudent, getInterests } from "@/lib/students";
+import { getRecentMemories } from "@/lib/memories";
 import { addSessionItem, createSession } from "@/lib/sessions";
 import { getPersona } from "@/lib/personas";
 import { buildSystemPrompt, type Mode } from "@/lib/prompt";
@@ -32,9 +33,10 @@ export async function POST(req: Request) {
 
   const student = db && studentId ? await getStudent(db, studentId) : null;
   const interestRows = db && studentId ? await getInterests(db, studentId) : [];
+  const memoryRows = db && studentId ? await getRecentMemories(db, studentId, 8) : [];
   const level = student?.level ?? 2;
   const interests = interestRows.map((r) => r.tag);
-  const memory = interestRows.map((r) => r.note).filter((n): n is string => !!n);
+  const memory = memoryRows.map((m) => m.content);
 
   const system = buildSystemPrompt({ persona, level, interests, memory, mode });
 

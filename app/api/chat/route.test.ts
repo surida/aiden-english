@@ -3,6 +3,7 @@ import { test, expect, vi, beforeEach } from "vitest";
 const chatCreate = vi.fn();
 const getStudent = vi.fn();
 const getInterests = vi.fn();
+const getRecentMemories = vi.fn();
 const addSessionItem = vi.fn();
 const createSession = vi.fn();
 
@@ -14,6 +15,9 @@ vi.mock("@/lib/db", () => ({ createServerClient: () => ({}) }));
 vi.mock("@/lib/students", () => ({
   getStudent: (...a: unknown[]) => getStudent(...a),
   getInterests: (...a: unknown[]) => getInterests(...a),
+}));
+vi.mock("@/lib/memories", () => ({
+  getRecentMemories: (...a: unknown[]) => getRecentMemories(...a),
 }));
 vi.mock("@/lib/sessions", () => ({
   addSessionItem: (...a: unknown[]) => addSessionItem(...a),
@@ -30,13 +34,16 @@ beforeEach(() => {
   chatCreate.mockReset();
   getStudent.mockReset();
   getInterests.mockReset();
+  getRecentMemories.mockReset();
+  getRecentMemories.mockResolvedValue([]);
   addSessionItem.mockReset();
   createSession.mockReset();
 });
 
 test("streams reply, builds a persona/level prompt, and persists both turns", async () => {
   getStudent.mockResolvedValue({ id: "s1", level: 3 });
-  getInterests.mockResolvedValue([{ tag: "kpop", note: "exam on Friday" }]);
+  getInterests.mockResolvedValue([{ tag: "kpop", note: null }]);
+  getRecentMemories.mockResolvedValue([{ content: "math exam on Friday", kind: "event" }]);
   chatCreate.mockResolvedValue(fakeStream(["He", "llo", "!"]));
 
   const req = new Request("http://localhost/api/chat", {

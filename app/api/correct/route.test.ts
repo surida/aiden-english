@@ -7,6 +7,7 @@ const endSession = vi.fn();
 const getSessionStudentId = vi.fn();
 const getStudent = vi.fn();
 const setLevel = vi.fn();
+const addMemory = vi.fn();
 
 vi.mock("@/lib/openai", () => ({
   createOpenAI: () => ({ chat: { completions: { create: chatCreate } } }),
@@ -23,6 +24,9 @@ vi.mock("@/lib/students", () => ({
   getStudent: (...a: unknown[]) => getStudent(...a),
   setLevel: (...a: unknown[]) => setLevel(...a),
 }));
+vi.mock("@/lib/memories", () => ({
+  addMemory: (...a: unknown[]) => addMemory(...a),
+}));
 
 import { POST } from "./route";
 
@@ -34,6 +38,7 @@ beforeEach(() => {
   getSessionStudentId.mockReset();
   getStudent.mockReset();
   setLevel.mockReset();
+  addMemory.mockReset();
 });
 
 test("parses corrections, persists matches, nudges level, ends session", async () => {
@@ -51,6 +56,7 @@ test("parses corrections, persists matches, nudges level, ends session", async (
               { original: "I go school", fixed: "I go to school", note: "to" },
               { original: "she happy", fixed: "she is happy", note: "be" },
             ],
+            memories: [{ content: "has a dog named Coco", kind: "fact" }],
           }),
         },
       },
@@ -74,6 +80,8 @@ test("parses corrections, persists matches, nudges level, ends session", async (
   });
   // too_easy at level 3 -> nudged up to 4
   expect(setLevel).toHaveBeenCalledWith(expect.anything(), "s1", 4);
+  // notable memory stored for continuity
+  expect(addMemory).toHaveBeenCalledWith(expect.anything(), "s1", "has a dog named Coco", "fact");
   expect(endSession).toHaveBeenCalledWith(expect.anything(), "sess1");
 });
 

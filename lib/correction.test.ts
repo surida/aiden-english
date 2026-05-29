@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { parseCorrections, parseLevelSignal, buildCorrectionPrompt } from "./correction";
+import { parseCorrections, parseLevelSignal, parseMemories, buildCorrectionPrompt } from "./correction";
 
 test("parses a valid JSON array of corrections", () => {
   const json = JSON.stringify([
@@ -54,6 +54,23 @@ test("parseLevelSignal extracts the signal and defaults to ok", () => {
   expect(parseLevelSignal("garbage {{{")).toBe("ok");
   expect(parseLevelSignal("")).toBe("ok");
   expect(parseLevelSignal({ levelSignal: "bogus" })).toBe("ok");
+});
+
+test("parseMemories extracts content + kind, caps at 5, tolerates garbage", () => {
+  const json = JSON.stringify({
+    memories: [
+      { content: "has a dog named Coco", kind: "fact" },
+      { content: "math exam on Friday", kind: "event" },
+      { content: "", kind: "fact" },
+    ],
+  });
+  const out = parseMemories(json);
+  expect(out).toEqual([
+    { content: "has a dog named Coco", kind: "fact" },
+    { content: "math exam on Friday", kind: "event" },
+  ]);
+  expect(parseMemories("garbage {{{")).toEqual([]);
+  expect(parseMemories(JSON.stringify({ corrections: [] }))).toEqual([]);
 });
 
 test("buildCorrectionPrompt includes student lines and asks for capped JSON", () => {

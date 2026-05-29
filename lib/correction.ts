@@ -1,8 +1,39 @@
 import type { LevelSignal } from "./level";
+import type { Memory, MemoryKind } from "./memories";
 
 export type Correction = { original: string; fixed: string; note: string };
 
 const MAX_CORRECTIONS = 3;
+const MAX_MEMORIES = 5;
+
+// Pulls durable memory items (facts/events) out of the same correction-pass JSON.
+export function parseMemories(input: unknown): Memory[] {
+  let value: unknown = input;
+  if (typeof value === "string") {
+    const text = stripFences(value).trim();
+    if (!text) return [];
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return [];
+    }
+  }
+  const arr = Array.isArray((value as { memories?: unknown })?.memories)
+    ? (value as { memories: unknown[] }).memories
+    : [];
+  const out: Memory[] = [];
+  for (const item of arr) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (typeof o.content === "string" && o.content.trim()) {
+        const kind: MemoryKind = o.kind === "event" ? "event" : "fact";
+        out.push({ content: o.content.trim(), kind });
+      }
+    }
+    if (out.length >= MAX_MEMORIES) break;
+  }
+  return out;
+}
 
 // Pulls the level signal out of the same correction-pass JSON. Defaults to "ok"
 // (no level change) for empty/malformed input.
@@ -76,10 +107,12 @@ export function buildCorrectionPrompt(studentTurns: string[]): string {
     '- "ok": a good challenge with some mistakes.',
     '- "too_hard": very short, many errors, or lots of hesitation → ease off.',
     "",
+    "Also remember anything worth recalling next time — durable facts (a pet, a hobby, a favorite group) or near-term events (a test on Friday, a trip). Phrase each briefly in English.",
+    "",
     "Return ONLY valid JSON, an object of the form:",
-    '{"levelSignal": "too_easy|ok|too_hard", "corrections": [{"original": string, "fixed": string, "note": string}]}',
-    'At most 3 corrections. "note" is a short, friendly explanation in simple Korean.',
-    'If nothing is worth correcting, use "corrections": [].',
+    '{"levelSignal": "too_easy|ok|too_hard", "corrections": [{"original": string, "fixed": string, "note": string}], "memories": [{"content": string, "kind": "fact|event"}]}',
+    'At most 3 corrections and 5 memories. "note" is a short, friendly explanation in simple Korean.',
+    'If nothing is worth correcting, use "corrections": []. If nothing worth remembering, use "memories": [].',
     "",
     "Student's lines:",
     transcript,

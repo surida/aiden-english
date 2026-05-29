@@ -7,7 +7,14 @@ import {
   getSessionStudentId,
 } from "@/lib/sessions";
 import { getStudent, setLevel } from "@/lib/students";
-import { buildCorrectionPrompt, parseCorrections, parseLevelSignal, type Correction } from "@/lib/correction";
+import { addMemory } from "@/lib/memories";
+import {
+  buildCorrectionPrompt,
+  parseCorrections,
+  parseLevelSignal,
+  parseMemories,
+  type Correction,
+} from "@/lib/correction";
 import { nudgeLevel } from "@/lib/level";
 
 export const runtime = "nodejs";
@@ -45,6 +52,10 @@ export async function POST(req: Request) {
     if (studentId) {
       const student = await getStudent(db, studentId);
       if (student) await setLevel(db, studentId, nudgeLevel(student.level, signal));
+      // Remember notable facts/events for continuity in future sessions.
+      for (const mem of parseMemories(raw)) {
+        await addMemory(db, studentId, mem.content, mem.kind);
+      }
     }
   }
 
