@@ -95,6 +95,8 @@ export default function Conversation({
       if (!chat.ok || !chat.body) throw new Error("chat");
       const sid = chat.headers.get("x-session-id");
       if (sid) sessionRef.current = sid;
+      const levelHeader = chat.headers.get("x-level");
+      const level = levelHeader ? Number(levelHeader) : undefined;
 
       const aiId = crypto.randomUUID();
       sync([...messagesRef.current, { id: aiId, role: "ai", text: "" }]);
@@ -114,7 +116,7 @@ export default function Conversation({
         const sp = await fetch("/api/speak", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: full, voice: persona.voice }),
+          body: JSON.stringify({ text: full, voice: persona.voice, level }),
         });
         if (sp.ok) {
           const url = URL.createObjectURL(await sp.blob());

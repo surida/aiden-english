@@ -6,6 +6,7 @@ import {
   addSessionItem,
   getStudentItems,
   setItemCorrection,
+  getSessionStudentId,
 } from "./sessions";
 
 function makeMock(resolved: { data?: unknown; error?: unknown } = { data: null, error: null }) {
@@ -62,6 +63,15 @@ test("setItemCorrection updates the correction jsonb by item id", async () => {
   expect(m.from).toHaveBeenCalledWith("session_items");
   expect(m.update).toHaveBeenCalledWith({ correction });
   expect(m.eq).toHaveBeenCalledWith("id", "i1");
+});
+
+test("getSessionStudentId reads student_id for the session", async () => {
+  const m = makeMock({ data: { student_id: "s1" }, error: null });
+  const id = await getSessionStudentId(m as unknown as SupabaseClient, "sess-1");
+  expect(m.from).toHaveBeenCalledWith("sessions");
+  expect(m.select).toHaveBeenCalledWith("student_id");
+  expect(m.eq).toHaveBeenCalledWith("id", "sess-1");
+  expect(id).toBe("s1");
 });
 
 test("endSession stamps ended_at on the session", async () => {

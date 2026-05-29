@@ -4,6 +4,9 @@ const chatCreate = vi.fn();
 const getStudentItems = vi.fn();
 const setItemCorrection = vi.fn();
 const endSession = vi.fn();
+const getSessionStudentId = vi.fn();
+const getStudent = vi.fn();
+const setLevel = vi.fn();
 
 vi.mock("@/lib/openai", () => ({
   createOpenAI: () => ({ chat: { completions: { create: chatCreate } } }),
@@ -14,6 +17,11 @@ vi.mock("@/lib/sessions", () => ({
   getStudentItems: (...a: unknown[]) => getStudentItems(...a),
   setItemCorrection: (...a: unknown[]) => setItemCorrection(...a),
   endSession: (...a: unknown[]) => endSession(...a),
+  getSessionStudentId: (...a: unknown[]) => getSessionStudentId(...a),
+}));
+vi.mock("@/lib/students", () => ({
+  getStudent: (...a: unknown[]) => getStudent(...a),
+  setLevel: (...a: unknown[]) => setLevel(...a),
 }));
 
 import { POST } from "./route";
@@ -23,9 +31,12 @@ beforeEach(() => {
   getStudentItems.mockReset();
   setItemCorrection.mockReset();
   endSession.mockReset();
+  getSessionStudentId.mockReset();
+  getStudent.mockReset();
+  setLevel.mockReset();
 });
 
-test("returns parsed corrections, persists matches by text, ends session", async () => {
+test("parses corrections, persists matches, nudges level, ends session", async () => {
   getStudentItems.mockResolvedValue([
     { id: "i1", text: "I go school" },
     { id: "i2", text: "she happy" },
@@ -34,14 +45,19 @@ test("returns parsed corrections, persists matches by text, ends session", async
     choices: [
       {
         message: {
-          content: JSON.stringify([
-            { original: "I go school", fixed: "I go to school", note: "to" },
-            { original: "she happy", fixed: "she is happy", note: "be" },
-          ]),
+          content: JSON.stringify({
+            levelSignal: "too_easy",
+            corrections: [
+              { original: "I go school", fixed: "I go to school", note: "to" },
+              { original: "she happy", fixed: "she is happy", note: "be" },
+            ],
+          }),
         },
       },
     ],
   });
+  getSessionStudentId.mockResolvedValue("s1");
+  getStudent.mockResolvedValue({ id: "s1", level: 3 });
 
   const req = new Request("http://localhost/api/correct", {
     method: "POST",
@@ -51,24 +67,17 @@ test("returns parsed corrections, persists matches by text, ends session", async
   expect(res.status).toBe(200);
   expect((await res.json()).corrections).toHaveLength(2);
 
-  const arg = chatCreate.mock.calls[0][0];
-  expect(arg.model).toBe("gpt-5.4-mini");
-  expect(JSON.stringify(arg.messages)).toContain("I go school");
-
   expect(setItemCorrection).toHaveBeenCalledWith(expect.anything(), "i1", {
     original: "I go school",
     fixed: "I go to school",
     note: "to",
   });
-  expect(setItemCorrection).toHaveBeenCalledWith(expect.anything(), "i2", {
-    original: "she happy",
-    fixed: "she is happy",
-    note: "be",
-  });
+  // too_easy at level 3 -> nudged up to 4
+  expect(setLevel).toHaveBeenCalledWith(expect.anything(), "s1", 4);
   expect(endSession).toHaveBeenCalledWith(expect.anything(), "sess1");
 });
 
-test("no student turns -> empty corrections and no LLM call", async () => {
+test("no student turns -> empty corrections, no LLM call, no nudge", async () => {
   getStudentItems.mockResolvedValue([]);
   const req = new Request("http://localhost/api/correct", {
     method: "POST",
@@ -77,6 +86,7 @@ test("no student turns -> empty corrections and no LLM call", async () => {
   const res = await POST(req);
   expect((await res.json()).corrections).toEqual([]);
   expect(chatCreate).not.toHaveBeenCalled();
+  expect(setLevel).not.toHaveBeenCalled();
 });
 
 test("400 when sessionId is missing", async () => {

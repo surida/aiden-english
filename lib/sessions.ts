@@ -38,6 +38,19 @@ export async function addSessionItem(
   if (error) throw error;
 }
 
+export async function getSessionStudentId(
+  client: SupabaseClient,
+  sessionId: string,
+): Promise<string | null> {
+  const { data, error } = await client
+    .from("sessions")
+    .select("student_id")
+    .eq("id", sessionId)
+    .single();
+  if (error) throw error;
+  return (data as { student_id: string | null } | null)?.student_id ?? null;
+}
+
 export async function getStudentItems(
   client: SupabaseClient,
   sessionId: string,

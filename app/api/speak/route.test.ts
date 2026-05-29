@@ -25,6 +25,19 @@ test("returns an audio stream and calls TTS with model, voice, input", async () 
   expect(arg.model).toBe("gpt-4o-mini-tts");
   expect(arg.voice).toBe("coral");
   expect(arg.input).toBe("hello");
+  expect(arg.speed).toBe(0.95); // default when no level
+});
+
+test("maps a low level to a slow speed + clarity instructions", async () => {
+  speechCreate.mockResolvedValue(new Response(new Uint8Array([1])));
+  const req = new Request("http://localhost/api/speak", {
+    method: "POST",
+    body: JSON.stringify({ text: "hi", voice: "shimmer", level: 1 }),
+  });
+  await POST(req);
+  const arg = speechCreate.mock.calls[0][0];
+  expect(arg.speed).toBe(0.85);
+  expect(arg.instructions).toMatch(/slow/i);
 });
 
 test("defaults the voice when none is provided", async () => {

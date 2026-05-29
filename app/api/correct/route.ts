@@ -1,7 +1,14 @@
 import { createOpenAI, MODELS } from "@/lib/openai";
 import { createServerClient } from "@/lib/db";
-import { getStudentItems, setItemCorrection, endSession } from "@/lib/sessions";
-import { buildCorrectionPrompt, parseCorrections, type Correction } from "@/lib/correction";
+import {
+  getStudentItems,
+  setItemCorrection,
+  endSession,
+  getSessionStudentId,
+} from "@/lib/sessions";
+import { getStudent, setLevel } from "@/lib/students";
+import { buildCorrectionPrompt, parseCorrections, parseLevelSignal, type Correction } from "@/lib/correction";
+import { nudgeLevel } from "@/lib/level";
 
 export const runtime = "nodejs";
 
@@ -23,12 +30,21 @@ export async function POST(req: Request) {
       model: MODELS.correct,
       messages: [{ role: "user", content: buildCorrectionPrompt(items.map((i) => i.text)) }],
     });
-    corrections = parseCorrections(completion.choices[0]?.message?.content ?? "");
+    const raw = completion.choices[0]?.message?.content ?? "";
+    corrections = parseCorrections(raw);
 
     // Attach each correction to the student turn it refers to (matched by text).
     for (const c of corrections) {
       const item = items.find((i) => i.text === c.original);
       if (item) await setItemCorrection(db, item.id, c);
+    }
+
+    // Gradually nudge the hidden level for this session's student (max +/-1).
+    const signal = parseLevelSignal(raw);
+    const studentId = await getSessionStudentId(db, sessionId);
+    if (studentId) {
+      const student = await getStudent(db, studentId);
+      if (student) await setLevel(db, studentId, nudgeLevel(student.level, signal));
     }
   }
 

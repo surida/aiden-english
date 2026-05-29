@@ -89,6 +89,7 @@ export async function POST(req: Request) {
   const headers: Record<string, string> = {
     "Content-Type": "text/plain; charset=utf-8",
     "Cache-Control": "no-store",
+    "X-Level": String(level),
   };
   if (activeSession) headers["X-Session-Id"] = activeSession;
 

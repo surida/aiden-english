@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { parseCorrections, buildCorrectionPrompt } from "./correction";
+import { parseCorrections, parseLevelSignal, buildCorrectionPrompt } from "./correction";
 
 test("parses a valid JSON array of corrections", () => {
   const json = JSON.stringify([
@@ -40,6 +40,20 @@ test("drops items missing required fields and defaults note to empty string", ()
 test("accepts an already-parsed array, not just strings", () => {
   const out = parseCorrections([{ original: "a", fixed: "b", note: "c" }]);
   expect(out).toHaveLength(1);
+});
+
+test("parseCorrections reads the {corrections:[...]} object form", () => {
+  const json = JSON.stringify({ levelSignal: "ok", corrections: [{ original: "a", fixed: "b", note: "c" }] });
+  expect(parseCorrections(json)).toHaveLength(1);
+});
+
+test("parseLevelSignal extracts the signal and defaults to ok", () => {
+  expect(parseLevelSignal(JSON.stringify({ levelSignal: "too_easy", corrections: [] }))).toBe("too_easy");
+  expect(parseLevelSignal(JSON.stringify({ levelSignal: "too_hard" }))).toBe("too_hard");
+  expect(parseLevelSignal(JSON.stringify({ corrections: [] }))).toBe("ok");
+  expect(parseLevelSignal("garbage {{{")).toBe("ok");
+  expect(parseLevelSignal("")).toBe("ok");
+  expect(parseLevelSignal({ levelSignal: "bogus" })).toBe("ok");
 });
 
 test("buildCorrectionPrompt includes student lines and asks for capped JSON", () => {

@@ -1,6 +1,25 @@
+import type { LevelSignal } from "./level";
+
 export type Correction = { original: string; fixed: string; note: string };
 
 const MAX_CORRECTIONS = 3;
+
+// Pulls the level signal out of the same correction-pass JSON. Defaults to "ok"
+// (no level change) for empty/malformed input.
+export function parseLevelSignal(input: unknown): LevelSignal {
+  let value: unknown = input;
+  if (typeof value === "string") {
+    const text = stripFences(value).trim();
+    if (!text) return "ok";
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return "ok";
+    }
+  }
+  const signal = (value as { levelSignal?: unknown })?.levelSignal;
+  return signal === "too_easy" || signal === "too_hard" ? signal : "ok";
+}
 
 // LLM output is often wrapped in a ```json ... ``` fence; unwrap it if present.
 function stripFences(s: string): string {
@@ -52,10 +71,15 @@ export function buildCorrectionPrompt(studentTurns: string[]): string {
     "You are a gentle English coach reviewing what a teen learner said during a chat.",
     "From the student's lines below, pick the MOST useful corrections (grammar, word choice, or natural phrasing).",
     "Skip anything already correct. Be kind and encouraging — this is shown after the chat, never during it.",
+    "Also judge whether the overall difficulty fit this student:",
+    '- "too_easy": fluent, complex, almost no errors → they can handle harder.',
+    '- "ok": a good challenge with some mistakes.',
+    '- "too_hard": very short, many errors, or lots of hesitation → ease off.',
     "",
-    'Return ONLY valid JSON: an array of at most 3 objects, each {"original": string, "fixed": string, "note": string}.',
-    '"note" is a short, friendly explanation written in simple Korean.',
-    "If there is nothing worth correcting, return [].",
+    "Return ONLY valid JSON, an object of the form:",
+    '{"levelSignal": "too_easy|ok|too_hard", "corrections": [{"original": string, "fixed": string, "note": string}]}',
+    'At most 3 corrections. "note" is a short, friendly explanation in simple Korean.',
+    'If nothing is worth correcting, use "corrections": [].',
     "",
     "Student's lines:",
     transcript,
