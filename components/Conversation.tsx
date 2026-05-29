@@ -71,58 +71,54 @@ export default function Conversation({
     }
   }
 
-  // Shared by every input method (mic, keyboard, and later hands-free):
-  // takes the student's text and runs chat -> (optional) speak.
+  // Calls chat, streams tokens into a fresh AI bubble, then speaks (unless muted).
+  // Shared by keyboard, mic, and the opener.
+  async function streamReply(body: Record<string, unknown>) {
+    setStatus("thinking");
+    const chat = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...body, sessionId: sessionRef.current ?? undefined }),
+    });
+    if (!chat.ok || !chat.body) throw new Error("chat");
+    const sid = chat.headers.get("x-session-id");
+    if (sid) sessionRef.current = sid;
+    const levelHeader = chat.headers.get("x-level");
+    const level = levelHeader ? Number(levelHeader) : undefined;
+
+    const aiId = crypto.randomUUID();
+    sync([...messagesRef.current, { id: aiId, role: "ai", text: "" }]);
+    const reader = chat.body.getReader();
+    const dec = new TextDecoder();
+    let full = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += dec.decode(value, { stream: true });
+      sync(messagesRef.current.map((m) => (m.id === aiId ? { ...m, text: full } : m)));
+    }
+
+    if (full.trim() && !muted) {
+      setStatus("speaking");
+      const sp = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: full, voice: persona.voice, level }),
+      });
+      if (sp.ok) await playAudio(URL.createObjectURL(await sp.blob()));
+    }
+    setStatus("idle");
+  }
+
+  // Shared by every input method (mic, keyboard, hands-free): runs one student turn.
   async function sendText(userText: string) {
     const text = userText.trim();
     if (!text || status !== "idle" || finishing) return;
     setError("");
     const priorHistory = messagesRef.current.map((m) => ({ role: m.role, text: m.text }));
     sync([...messagesRef.current, { id: crypto.randomUUID(), role: "student", text }]);
-
     try {
-      setStatus("thinking");
-      const chat = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          studentId,
-          personaId,
-          mode,
-          userText: text,
-          history: priorHistory,
-          sessionId: sessionRef.current ?? undefined,
-        }),
-      });
-      if (!chat.ok || !chat.body) throw new Error("chat");
-      const sid = chat.headers.get("x-session-id");
-      if (sid) sessionRef.current = sid;
-      const levelHeader = chat.headers.get("x-level");
-      const level = levelHeader ? Number(levelHeader) : undefined;
-
-      const aiId = crypto.randomUUID();
-      sync([...messagesRef.current, { id: aiId, role: "ai", text: "" }]);
-      const reader = chat.body.getReader();
-      const dec = new TextDecoder();
-      let full = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += dec.decode(value, { stream: true });
-        sync(messagesRef.current.map((m) => (m.id === aiId ? { ...m, text: full } : m)));
-      }
-
-      if (full.trim() && !muted) {
-        setStatus("speaking");
-        const sp = await fetch("/api/speak", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: full, voice: persona.voice, level }),
-        });
-        if (sp.ok) await playAudio(URL.createObjectURL(await sp.blob()));
-      }
-      setStatus("idle");
-
+      await streamReply({ studentId, personaId, mode, userText: text, history: priorHistory });
       const studentTurns = messagesRef.current.filter((m) => m.role === "student").length;
       if (mode === "diagnostic" && onComplete && studentTurns >= (maxStudentTurns ?? 4)) {
         setFinishing(true);
@@ -133,6 +129,16 @@ export default function Conversation({
       setError("앗, 잠깐 문제가 생겼어. 다시 해볼래?");
     }
   }
+
+  // On open, the AI greets first using the student's interests/memory (not in
+  // diagnostic mode, and only for a known profile).
+  const openerRan = useRef(false);
+  useEffect(() => {
+    if (openerRan.current || mode === "diagnostic" || !studentId) return;
+    openerRan.current = true;
+    streamReply({ studentId, personaId, mode, opener: true }).catch(() => setStatus("idle"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleAudio(blob: Blob) {
     setError("");
