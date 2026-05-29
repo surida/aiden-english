@@ -1,6 +1,14 @@
 import { test, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getStudent, setLevel, addInterest, getInterests } from "./students";
+import {
+  getStudent,
+  setLevel,
+  addInterest,
+  getInterests,
+  createStudent,
+  listStudents,
+  markDiagnosed,
+} from "./students";
 
 // Chainable + thenable mock of the Supabase query builder. Every method records
 // its args and returns the same builder; `single()` and awaiting the builder
@@ -12,6 +20,7 @@ function makeMock(resolved: { data?: unknown; error?: unknown } = { data: null, 
   builder.update = vi.fn(() => builder);
   builder.insert = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
+  builder.order = vi.fn(() => builder);
   builder.single = vi.fn(() => Promise.resolve(resolved));
   builder.then = (resolve: (v: unknown) => void) => resolve(resolved);
   return builder;
@@ -46,6 +55,36 @@ test("addInterest defaults note to null when omitted", async () => {
   const m = makeMock();
   await addInterest(m as unknown as SupabaseClient, "s1", "games");
   expect(m.insert).toHaveBeenCalledWith({ student_id: "s1", tag: "games", note: null });
+});
+
+test("createStudent inserts display_name and returns the new id", async () => {
+  const m = makeMock({ data: { id: "s9" }, error: null });
+  const id = await createStudent(m as unknown as SupabaseClient, "Mina");
+  expect(m.from).toHaveBeenCalledWith("students");
+  expect(m.insert).toHaveBeenCalledWith({ display_name: "Mina" });
+  expect(m.select).toHaveBeenCalledWith("id");
+  expect(id).toBe("s9");
+});
+
+test("listStudents returns id + display_name ordered", async () => {
+  const m = makeMock({ data: [{ id: "s1", display_name: "A" }], error: null });
+  const out = await listStudents(m as unknown as SupabaseClient);
+  expect(m.from).toHaveBeenCalledWith("students");
+  expect(m.select).toHaveBeenCalledWith("id, display_name");
+  expect(out).toEqual([{ id: "s1", display_name: "A" }]);
+});
+
+test("markDiagnosed updates level and stamps diagnosed_at", async () => {
+  const m = makeMock();
+  await markDiagnosed(m as unknown as SupabaseClient, "s1", 3);
+  expect(m.from).toHaveBeenCalledWith("students");
+  const updateArg = (m.update as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0] as {
+    level: number;
+    diagnosed_at: string;
+  };
+  expect(updateArg.level).toBe(3);
+  expect(typeof updateArg.diagnosed_at).toBe("string");
+  expect(m.eq).toHaveBeenCalledWith("id", "s1");
 });
 
 test("getInterests selects tag + note for the student", async () => {

@@ -10,6 +10,30 @@ export type Student = {
 
 export type Interest = { tag: string; note: string | null };
 
+export async function createStudent(
+  client: SupabaseClient,
+  displayName: string,
+): Promise<string> {
+  const { data, error } = await client
+    .from("students")
+    .insert({ display_name: displayName })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return (data as { id: string }).id;
+}
+
+export async function listStudents(
+  client: SupabaseClient,
+): Promise<{ id: string; display_name: string }[]> {
+  const { data, error } = await client
+    .from("students")
+    .select("id, display_name")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as { id: string; display_name: string }[];
+}
+
 export async function getStudent(
   client: SupabaseClient,
   id: string,
@@ -29,6 +53,18 @@ export async function setLevel(
   level: number,
 ): Promise<void> {
   const { error } = await client.from("students").update({ level }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function markDiagnosed(
+  client: SupabaseClient,
+  id: string,
+  level: number,
+): Promise<void> {
+  const { error } = await client
+    .from("students")
+    .update({ level, diagnosed_at: new Date().toISOString() })
+    .eq("id", id);
   if (error) throw error;
 }
 
