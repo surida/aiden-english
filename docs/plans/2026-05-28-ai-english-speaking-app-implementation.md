@@ -12,6 +12,12 @@
 
 > **Testing reality:** Voice + LLM calls are non-deterministic external APIs. TDD targets the *deterministic* core (schema access, persona loading, prompt assembly, correction parsing, API contracts with mocked SDK). The end-to-end voice loop is verified by integration + manual browser testing.
 
+> **Adaptive difficulty & speaking speed (added 2026-05-29):** The hidden level (1–6) drives vocabulary/scaffolding **and** TTS speed, and adapts gradually over time.
+> - **Start:** the first-run diagnostic (Task 15) measures 1–6, then the starting level is stored as `max(1, measured − 1)` — start one notch low for an easy-win first session.
+> - **Per turn (instant, no extra cost):** `buildSystemPrompt` already adapts vocabulary / sentence-length / Korean-scaffolding to the stored level; that same level now also sets TTS speed.
+> - **TTS speed (Task 9):** level → speed `1:0.85 · 2:0.9 · 3:0.95 · 4:1.0 · 5:1.05 · 6:1.1`; for `gpt-4o-mini-tts` also pass `instructions` ("slow, clear") at low levels. The client sends the current level to `/api/speak`; stateless default 0.95.
+> - **Session-end nudge (Task 10 + 17, gradual):** the `/api/correct` pass also emits a `levelSignal` (`too_easy|ok|too_hard`) from the student's turns and applies `setLevel(clamp(level ±1, 1, 6))` — max ±1 per session, so the climb is smooth. Level is never shown to the student; only persisted for a logged-in student.
+
 ---
 
 ## Phase 0 — Project setup
@@ -274,17 +280,17 @@ test("diagnostic mode asks to probe level naturally", () => {
 
 **Files:** Create `app/api/speak/route.ts`, test
 
-- **Test (mocked):** POST `{text, voice}` → returns audio stream; SDK called with persona voice.
-- **Implement:** `openai.audio.speech.create({ model, voice, input })`, stream audio bytes.
-- **Manual smoke:** hear the voice.
-- **Commit:** `feat: TTS speak route`
+- **Test (mocked):** POST `{text, voice, level?}` → returns audio stream; SDK called with persona voice + level-derived speed.
+- **Implement:** `openai.audio.speech.create({ model, voice, input, speed })`, stream audio bytes. Map `level → speed` (1:0.85 … 6:1.1; default 0.95 when no level); for `gpt-4o-mini-tts` also add `instructions` ("slow, clear") at low levels.
+- **Manual smoke:** hear the voice; confirm low level is slower.
+- **Commit:** `feat: TTS speak route` (speed-by-level added in Phase 4b)
 
 ### Task 10: `/api/correct` (async correction pass)
 
 **Files:** Create `app/api/correct/route.ts`, test
 
-- **Test (mocked):** given a session's student turns → returns ≤3 `{original, fixed, note}`; stores them on `session_items.correction`.
-- **Implement:** correction-prompt (Task 6) over the session transcript, parse JSON, persist. Runs after session end (not mid-chat).
+- **Test (mocked):** given a session's student turns → returns ≤3 `{original, fixed, note}` **and a `levelSignal` (`too_easy|ok|too_hard`)**; stores corrections on `session_items.correction` and nudges level `setLevel(clamp(level ±1, 1, 6))`.
+- **Implement:** correction-prompt (Task 6) over the session transcript, parse JSON, persist. Runs after session end (not mid-chat). (Level-signal + nudge added in Phase 4b.)
 - **Commit:** `feat: async correction route`
 
 ### Task 11: Minimal PIN auth
@@ -313,13 +319,13 @@ test("diagnostic mode asks to probe level naturally", () => {
 - `app/select/page.tsx`: list `listPersonas()`, simple avatar/emoji, store choice. Commit.
 
 ### Task 15: First-run diagnostic flow
-- `app/diagnose/page.tsx`: run 3–5 turns in `mode:"diagnostic"`; then one LLM call analyzes the transcript → returns internal level (1–6) → `setLevel`. Level never shown. Commit.
+- `app/diagnose/page.tsx`: run 3–5 turns in `mode:"diagnostic"`; then one LLM call analyzes the transcript → returns internal level (1–6) → store `setLevel(max(1, measured − 1))` (start one notch low). Level never shown. Commit.
 
 ### Task 16: Interest intake
 - During/after diagnostic, AI asks about interests conversationally; extract tags via an LLM call → `addInterest`. Commit.
 
 ### Task 17: Session-end "Today's tips"
-- On end, call `/api/correct`, show ≤3 gentle tip cards. No red marks mid-chat. Commit.
+- On end, call `/api/correct` (which also nudges the hidden level ±1), show ≤3 gentle tip cards. No red marks mid-chat. The level change stays invisible. Commit.
 
 ### Task 18: Help / hint escape hatch
 - "도와줘 / hint" button → injects a one-time "give a Korean hint / model answer" instruction for the next turn. Commit.
