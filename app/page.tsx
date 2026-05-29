@@ -1,66 +1,58 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main
+      style={{
+        position: "relative",
+        zIndex: 1,
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        padding: 24,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ display: "grid", justifyItems: "center", gap: 22, animation: "float-in .6s ease both" }}>
+        <div
+          style={{
+            width: 110,
+            height: 110,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 56,
+            background: "linear-gradient(150deg, var(--peach), var(--rose) 60%, var(--coral))",
+            boxShadow: "0 18px 44px var(--shadow-coral)",
+            animation: "breathe 3.6s ease-in-out infinite",
+          }}
+        >
+          🎀
+        </div>
+
+        <div>
+          <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: -0.5 }}>Aiden English</h1>
+          <p style={{ color: "var(--ink-soft)", fontSize: 16, marginTop: 6 }}>
+            오늘 Mia가 너한테 물어볼 게 있대 👀
           </p>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <Link
+          href="/chat"
+          style={{
+            padding: "15px 30px",
+            borderRadius: 999,
+            fontFamily: "var(--font-display)",
+            fontSize: 18,
+            fontWeight: 600,
+            color: "#fff",
+            background: "linear-gradient(160deg, var(--coral), var(--coral-deep))",
+            boxShadow: "0 14px 32px var(--shadow-coral)",
+          }}
+        >
+          Mia랑 얘기하기 →
+        </Link>
+      </div>
+    </main>
   );
 }
