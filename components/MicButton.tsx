@@ -9,12 +9,7 @@ type Props = {
 };
 
 function pickMime(): string {
-  const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-    "audio/ogg",
-  ];
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   if (typeof MediaRecorder === "undefined") return "";
   return candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? "";
 }
@@ -22,25 +17,27 @@ function pickMime(): string {
 export default function MicButton({ onAudio, busy = false, hint }: Props) {
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
-  const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
-
-  async function ensureStream(): Promise<MediaStream> {
-    if (streamRef.current) return streamRef.current;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("insecure"); // mic needs HTTPS (or localhost)
-    }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    streamRef.current = stream;
-    return stream;
-  }
+  // Tracks whether the finger is still down, so a release during the async
+  // getUserMedia call doesn't leave a dangling recorder/stream.
+  const pressedRef = useRef(false);
 
   async function start() {
     if (busy || recording) return;
     setError("");
+    pressedRef.current = true;
     try {
-      const stream = await ensureStream();
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("insecure");
+      // Fresh stream per recording: reusing one stream makes Chrome drop the
+      // WebM header on 2nd+ recordings, which OpenAI rejects as corrupted.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      if (!pressedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
       const mimeType = pickMime();
       const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
@@ -49,25 +46,24 @@ export default function MicButton({ onAudio, busy = false, hint }: Props) {
       };
       rec.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-        if (blob.size > 0) onAudio(blob);
+        stream.getTracks().forEach((t) => t.stop());
+        if (blob.size > 1200) onAudio(blob);
+        else setError("조금만 더 길게 말해줘 🙂");
       };
       recRef.current = rec;
       rec.start();
       setRecording(true);
     } catch (err) {
       const name = (err as Error)?.name;
-      if ((err as Error)?.message === "insecure") {
-        setError("마이크는 https 또는 localhost에서만 써요");
-      } else if (name === "NotAllowedError" || name === "SecurityError") {
-        setError("마이크 권한을 켜주세요 🙏");
-      } else {
-        setError("마이크를 열 수 없어요");
-      }
+      if ((err as Error)?.message === "insecure") setError("마이크는 https 또는 localhost에서만 써요");
+      else if (name === "NotAllowedError" || name === "SecurityError") setError("마이크 권한을 켜주세요 🙏");
+      else setError("마이크를 열 수 없어요");
       setRecording(false);
     }
   }
 
   function stop() {
+    pressedRef.current = false;
     if (!recording) return;
     setRecording(false);
     recRef.current?.stop();
@@ -157,13 +153,7 @@ function MicIcon() {
   return (
     <svg width="46" height="46" viewBox="0 0 24 24" fill="none" aria-hidden>
       <rect x="9" y="2.5" width="6" height="11.5" rx="3" fill="#fff" />
-      <path
-        d="M5.5 11a6.5 6.5 0 0 0 13 0"
-        stroke="#fff"
-        strokeWidth="2.1"
-        strokeLinecap="round"
-        fill="none"
-      />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" fill="none" />
       <path d="M12 17.5V21" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" />
       <path d="M8.5 21h7" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" />
     </svg>

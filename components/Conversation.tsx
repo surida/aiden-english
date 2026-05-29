@@ -56,10 +56,19 @@ export default function Conversation({
     const priorHistory = messagesRef.current.map((m) => ({ role: m.role, text: m.text }));
 
     try {
-      // 1. transcribe
+      // 1. transcribe (filename extension must match the actual codec so
+      // OpenAI detects the format correctly)
       setStatus("transcribing");
+      const t = blob.type;
+      const ext = t.includes("mp4") || t.includes("m4a")
+        ? "mp4"
+        : t.includes("ogg")
+          ? "ogg"
+          : t.includes("wav")
+            ? "wav"
+            : "webm";
       const fd = new FormData();
-      fd.append("audio", blob, "clip.webm");
+      fd.append("audio", blob, `clip.${ext}`);
       const tr = await fetch("/api/transcribe", { method: "POST", body: fd });
       if (!tr.ok) throw new Error("transcribe");
       const { text: userText } = (await tr.json()) as { text: string };

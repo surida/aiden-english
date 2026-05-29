@@ -10,10 +10,17 @@ export async function POST(req: Request) {
   }
 
   const openai = createOpenAI();
-  const result = await openai.audio.transcriptions.create({
-    model: MODELS.stt,
-    file: audio,
-  });
-
-  return Response.json({ text: result.text });
+  try {
+    const result = await openai.audio.transcriptions.create({
+      model: MODELS.stt,
+      file: audio,
+      // This is an English-speaking app; force English so Korean-accented
+      // speech isn't misdetected as Korean/Chinese/etc.
+      language: "en",
+    });
+    return Response.json({ text: result.text });
+  } catch {
+    // Bad/corrupt/too-short audio: respond cleanly instead of a 500 stack.
+    return Response.json({ error: "could not understand audio" }, { status: 422 });
+  }
 }
