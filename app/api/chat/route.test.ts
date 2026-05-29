@@ -96,7 +96,30 @@ test("works statelessly without studentId/sessionId (no DB, no persistence)", as
   expect(addSessionItem).not.toHaveBeenCalled();
 });
 
-test("400 when userText is missing", async () => {
+test("opener: AI greets first with no userText, persists only the ai turn", async () => {
+  getStudent.mockResolvedValue({ id: "s1", level: 3 });
+  getInterests.mockResolvedValue([{ tag: "kpop", note: null }]);
+  getRecentMemories.mockResolvedValue([{ content: "has a dog named Coco", kind: "fact" }]);
+  chatCreate.mockResolvedValue(fakeStream(["Hey", "!"]));
+
+  const req = new Request("http://localhost/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ studentId: "s1", personaId: "mia", mode: "free", opener: true, sessionId: "sess1" }),
+  });
+  const res = await POST(req);
+  expect(res.status).toBe(200);
+  expect(await res.text()).toBe("Hey!");
+
+  const arg = chatCreate.mock.calls[0][0];
+  expect(arg.messages[0].role).toBe("system");
+  expect(arg.messages.at(-1).role).toBe("user"); // synthetic kickoff instruction
+
+  // no student turn for an opener; the ai greeting is persisted
+  expect(addSessionItem).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ role: "student" }));
+  expect(addSessionItem).toHaveBeenCalledWith(expect.anything(), { sessionId: "sess1", role: "ai", text: "Hey!" });
+});
+
+test("400 when userText is missing (and not an opener)", async () => {
   const req = new Request("http://localhost/api/chat", {
     method: "POST",
     body: JSON.stringify({ personaId: "mia", mode: "free" }),

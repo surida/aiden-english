@@ -13,15 +13,21 @@ type ChatBody = {
   personaId: string;
   mode: Mode;
   history?: { role: "student" | "ai"; text: string }[];
-  userText: string;
+  userText?: string;
   sessionId?: string;
+  opener?: boolean;
 };
+
+const OPENER_INSTRUCTION =
+  "Start the conversation yourself: greet me warmly in ONE short, casual line, " +
+  "naturally bringing up one of my interests or something you remember about me, " +
+  "and end with a question. Don't list facts mechanically — just sound like a friend.";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as ChatBody;
-  const { studentId, personaId, mode, history = [], userText, sessionId } = body;
+  const { studentId, personaId, mode, history = [], userText, sessionId, opener } = body;
 
-  if (!userText || !personaId) {
+  if (!personaId || (!opener && !userText)) {
     return Response.json({ error: "missing personaId or userText" }, { status: 400 });
   }
 
@@ -46,7 +52,7 @@ export async function POST(req: Request) {
       role: h.role === "ai" ? ("assistant" as const) : ("user" as const),
       content: h.text,
     })),
-    { role: "user" as const, content: userText },
+    { role: "user" as const, content: opener ? OPENER_INSTRUCTION : (userText as string) },
   ];
 
   // Resolve the session (lazily create one if we have a student but no session).
@@ -54,7 +60,8 @@ export async function POST(req: Request) {
   if (db && !activeSession && studentId) {
     activeSession = await createSession(db, { studentId, personaId, mode });
   }
-  if (db && activeSession) {
+  // Persist the student's turn (the opener has no student text).
+  if (db && activeSession && userText) {
     await addSessionItem(db, { sessionId: activeSession, role: "student", text: userText });
   }
 
