@@ -31,7 +31,15 @@ export default function MicButton({ onAudio, busy = false, hint }: Props) {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("insecure");
       // Fresh stream per recording: reusing one stream makes Chrome drop the
       // WebM header on 2nd+ recordings, which OpenAI rejects as corrupted.
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Explicit OS-level audio processing — especially AGC, which rescues
+      // the soft endings Korean speakers often trail off into.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
       if (!pressedRef.current) {
         stream.getTracks().forEach((t) => t.stop());
@@ -39,7 +47,10 @@ export default function MicButton({ onAudio, busy = false, hint }: Props) {
       }
 
       const mimeType = pickMime();
-      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const rec = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 128000,
+      });
       chunksRef.current = [];
       rec.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);

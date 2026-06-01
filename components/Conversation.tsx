@@ -177,6 +177,8 @@ export default function Conversation({
       const ext = t.includes("mp4") || t.includes("m4a") ? "mp4" : t.includes("ogg") ? "ogg" : t.includes("wav") ? "wav" : "webm";
       const fd = new FormData();
       fd.append("audio", blob, `clip.${ext}`);
+      if (studentId) fd.append("studentId", studentId);
+      fd.append("personaId", personaId);
       const tr = await fetch("/api/transcribe", { method: "POST", body: fd });
       if (!tr.ok) throw new Error("transcribe");
       const { text: userText } = (await tr.json()) as { text: string };
