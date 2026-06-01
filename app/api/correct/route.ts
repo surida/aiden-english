@@ -19,6 +19,8 @@ import {
 import { nudgeLevel } from "@/lib/level";
 
 export const runtime = "nodejs";
+// Correction LLM call + memory writes can take a few seconds; raise above 10s default.
+export const maxDuration = 60;
 
 type CorrectBody = { sessionId: string };
 

@@ -7,6 +7,8 @@ import { getPersona } from "@/lib/personas";
 import { buildSystemPrompt, type Mode } from "@/lib/prompt";
 
 export const runtime = "nodejs";
+// OpenAI streaming can run long; Vercel Hobby defaults to 10s otherwise.
+export const maxDuration = 60;
 
 type ChatBody = {
   studentId?: string;
