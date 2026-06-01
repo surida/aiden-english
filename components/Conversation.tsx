@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getPersona } from "@/lib/personas";
 import type { Mode } from "@/lib/prompt";
+import type { Correction } from "@/lib/correction";
 import MicButton from "./MicButton";
 
 type Msg = { id: string; role: "student" | "ai"; text: string };
@@ -38,7 +40,10 @@ export default function Conversation({
   const [pendingAudio, setPendingAudio] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [draft, setDraft] = useState("");
+  const [tips, setTips] = useState<Correction[] | null>(null);
+  const [ending, setEnding] = useState(false);
 
+  const router = useRouter();
   const messagesRef = useRef<Msg[]>([]);
   const sessionRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -53,6 +58,30 @@ export default function Conversation({
       localStorage.setItem("aiden_muted", next ? "1" : "0");
       return next;
     });
+  }
+
+  // End the session: runs the correction pass (also nudges level + saves
+  // memories server-side) and shows gentle tip cards.
+  async function finishSession() {
+    if (status !== "idle" || finishing || ending) return;
+    if (!sessionRef.current) {
+      router.push("/");
+      return;
+    }
+    setEnding(true);
+    try {
+      const res = await fetch("/api/correct", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: sessionRef.current }),
+      });
+      const data = res.ok ? ((await res.json()) as { corrections: Correction[] }) : { corrections: [] };
+      setTips(data.corrections ?? []);
+    } catch {
+      setTips([]);
+    } finally {
+      setEnding(false);
+    }
   }
 
   function sync(next: Msg[]) {
@@ -175,6 +204,27 @@ export default function Conversation({
 
   return (
     <main style={{ position: "relative", zIndex: 1, minHeight: "100dvh", display: "grid", gridTemplateRows: "auto 1fr auto", maxWidth: 520, margin: "0 auto" }}>
+      {tips !== null && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 20, background: "rgba(58,46,51,.35)", backdropFilter: "blur(3px)", display: "grid", placeItems: "center", padding: 22 }}>
+          <div style={{ width: "100%", maxWidth: 440, maxHeight: "86dvh", overflowY: "auto", background: "var(--cream)", borderRadius: 26, padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,.25)", display: "grid", gap: 14, animation: "bubble-in .35s ease both" }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700, textAlign: "center" }}>오늘의 팁 ✨</h2>
+            {tips.length === 0 ? (
+              <p style={{ textAlign: "center", color: "var(--ink-soft)", padding: "8px 0" }}>오늘은 완벽했어! 또 얘기하자 🎉</p>
+            ) : (
+              tips.map((t, i) => (
+                <div key={i} style={{ background: "#fff", borderRadius: 16, padding: 14, boxShadow: "0 6px 16px var(--shadow-soft)" }}>
+                  <p style={{ fontSize: 13, color: "var(--ink-soft)", textDecoration: "line-through" }}>{t.original}</p>
+                  <p style={{ fontSize: 17, fontWeight: 600, color: "var(--coral-deep)", margin: "2px 0 6px" }}>{t.fixed}</p>
+                  {t.note && <p style={{ fontSize: 14 }}>{t.note}</p>}
+                </div>
+              ))
+            )}
+            <button onClick={() => router.push("/")} style={{ padding: 14, borderRadius: 14, fontSize: 16, fontWeight: 600, color: "#fff", background: "linear-gradient(160deg, var(--coral), var(--coral-deep))" }}>
+              홈으로 →
+            </button>
+          </div>
+        </div>
+      )}
       <header style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 20px", animation: "float-in .5s ease both" }}>
         <div style={{ width: 50, height: 50, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 26, background: "linear-gradient(150deg, var(--peach), var(--rose))", boxShadow: "0 8px 20px var(--shadow-soft)" }}>
           {AVATAR[personaId] ?? "💗"}
@@ -188,6 +238,16 @@ export default function Conversation({
         <button onClick={toggleMute} aria-label={muted ? "소리 켜기" : "소리 끄기"} style={{ fontSize: 22, padding: 6, lineHeight: 1 }}>
           {muted ? "🔇" : "🔊"}
         </button>
+        {mode !== "diagnostic" && (
+          <button
+            onClick={finishSession}
+            disabled={ending || finishing}
+            aria-label="오늘 여기까지"
+            style={{ fontSize: 13, fontWeight: 600, padding: "7px 12px", borderRadius: 999, color: "var(--coral-deep)", background: "#fff", boxShadow: "0 4px 12px var(--shadow-soft)" }}
+          >
+            {ending ? "정리 중…" : "끝내기"}
+          </button>
+        )}
       </header>
 
       <div ref={scrollRef} style={{ overflowY: "auto", padding: "8px 18px 18px", display: "grid", gap: 12, alignContent: "start" }}>
