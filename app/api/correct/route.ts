@@ -13,6 +13,7 @@ import {
   parseCorrections,
   parseLevelSignal,
   parseMemories,
+  saveCorrections,
   type Correction,
 } from "@/lib/correction";
 import { nudgeLevel } from "@/lib/level";
@@ -45,6 +46,9 @@ export async function POST(req: Request) {
       const item = items.find((i) => i.text === c.original);
       if (item) await setItemCorrection(db, item.id, c);
     }
+
+    // Persist for the weekly report's "recurring patterns".
+    await saveCorrections(db, sessionId, corrections);
 
     // Gradually nudge the hidden level for this session's student (max +/-1).
     const signal = parseLevelSignal(raw);

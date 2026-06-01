@@ -73,9 +73,15 @@ export default function Home() {
           {persona.name}랑 얘기하기 →
         </Link>
 
-        <Link href="/who" style={{ fontSize: 14, color: "var(--ink-soft)", textDecoration: "underline" }}>
-          프로필 바꾸기
-        </Link>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 14, color: "var(--ink-soft)" }}>
+          <Link href="/who" style={{ color: "inherit", textDecoration: "underline" }}>
+            프로필 바꾸기
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/family" style={{ color: "inherit", textDecoration: "underline" }}>
+            📊 이번 주
+          </Link>
+        </div>
       </div>
     </main>
   );

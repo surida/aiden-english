@@ -91,3 +91,16 @@ export async function addInterest(
     .insert({ student_id: studentId, tag, note: note ?? null });
   if (error) throw error;
 }
+
+export async function removeInterest(
+  client: SupabaseClient,
+  studentId: string,
+  tag: string,
+): Promise<void> {
+  const { error } = await client
+    .from("interests")
+    .delete()
+    .eq("student_id", studentId)
+    .eq("tag", tag);
+  if (error) throw error;
+}

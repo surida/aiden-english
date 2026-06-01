@@ -4,6 +4,7 @@ import {
   getStudent,
   setLevel,
   addInterest,
+  removeInterest,
   getInterests,
   createStudent,
   listStudents,
@@ -19,6 +20,7 @@ function makeMock(resolved: { data?: unknown; error?: unknown } = { data: null, 
   builder.select = vi.fn(() => builder);
   builder.update = vi.fn(() => builder);
   builder.insert = vi.fn(() => builder);
+  builder.delete = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
   builder.order = vi.fn(() => builder);
   builder.single = vi.fn(() => Promise.resolve(resolved));
@@ -55,6 +57,15 @@ test("addInterest defaults note to null when omitted", async () => {
   const m = makeMock();
   await addInterest(m as unknown as SupabaseClient, "s1", "games");
   expect(m.insert).toHaveBeenCalledWith({ student_id: "s1", tag: "games", note: null });
+});
+
+test("removeInterest deletes the matching tag row for the student", async () => {
+  const m = makeMock();
+  await removeInterest(m as unknown as SupabaseClient, "s1", "kpop");
+  expect(m.from).toHaveBeenCalledWith("interests");
+  expect(m.delete).toHaveBeenCalled();
+  expect(m.eq).toHaveBeenCalledWith("student_id", "s1");
+  expect(m.eq).toHaveBeenCalledWith("tag", "kpop");
 });
 
 test("createStudent inserts display_name and returns the new id", async () => {

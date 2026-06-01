@@ -8,6 +8,7 @@ const getSessionStudentId = vi.fn();
 const getStudent = vi.fn();
 const setLevel = vi.fn();
 const addMemory = vi.fn();
+const saveCorrections = vi.fn();
 
 vi.mock("@/lib/openai", () => ({
   createOpenAI: () => ({ chat: { completions: { create: chatCreate } } }),
@@ -27,6 +28,10 @@ vi.mock("@/lib/students", () => ({
 vi.mock("@/lib/memories", () => ({
   addMemory: (...a: unknown[]) => addMemory(...a),
 }));
+vi.mock("@/lib/correction", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/correction")>("@/lib/correction");
+  return { ...actual, saveCorrections: (...a: unknown[]) => saveCorrections(...a) };
+});
 
 import { POST } from "./route";
 
@@ -39,6 +44,7 @@ beforeEach(() => {
   getStudent.mockReset();
   setLevel.mockReset();
   addMemory.mockReset();
+  saveCorrections.mockReset();
 });
 
 test("parses corrections, persists matches, nudges level, ends session", async () => {
@@ -82,6 +88,10 @@ test("parses corrections, persists matches, nudges level, ends session", async (
   expect(setLevel).toHaveBeenCalledWith(expect.anything(), "s1", 4);
   // notable memory stored for continuity
   expect(addMemory).toHaveBeenCalledWith(expect.anything(), "s1", "has a dog named Coco", "fact");
+  // corrections persisted for the weekly report
+  expect(saveCorrections).toHaveBeenCalledWith(expect.anything(), "sess1", expect.arrayContaining([
+    expect.objectContaining({ original: "I go school", fixed: "I go to school" }),
+  ]));
   expect(endSession).toHaveBeenCalledWith(expect.anything(), "sess1");
 });
 

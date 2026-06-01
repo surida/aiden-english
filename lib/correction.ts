@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LevelSignal } from "./level";
 import type { Memory, MemoryKind } from "./memories";
 
@@ -94,6 +95,22 @@ export function parseCorrections(input: unknown): Correction[] {
     if (out.length >= MAX_CORRECTIONS) break;
   }
   return out;
+}
+
+export async function saveCorrections(
+  client: SupabaseClient,
+  sessionId: string,
+  corrections: Correction[],
+): Promise<void> {
+  if (!corrections.length) return;
+  const rows = corrections.map((c) => ({
+    session_id: sessionId,
+    original: c.original,
+    fixed: c.fixed,
+    note: c.note || null,
+  }));
+  const { error } = await client.from("corrections").insert(rows);
+  if (error) throw error;
 }
 
 export function buildCorrectionPrompt(studentTurns: string[]): string {

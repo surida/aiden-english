@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Profile = { id: string; display_name: string };
 
@@ -107,6 +108,13 @@ export default function WhoPage() {
             + 새로 시작하기
           </button>
         )}
+
+        <Link
+          href="/family?view=family"
+          style={{ marginTop: 6, textAlign: "center", fontSize: 14, color: "var(--ink-soft)", textDecoration: "underline" }}
+        >
+          📊 이번 주 우리 가족
+        </Link>
       </div>
     </main>
   );
